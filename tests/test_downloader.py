@@ -27,13 +27,13 @@ def test_download_data_valid_ticker():
         # Verify the download was called with the correct arguments
         mock_download.assert_called_once_with("AAPL", start="2024-01-01", end="2024-01-31", interval="1d")
 
-def test_download_data_invalid_ticker():
-    """Test downloading data for an invalid ticker raises DownloadError."""
-    # For an invalid ticker, we want the download to return an empty DataFrame
+def test_download_data_empty_returns_empty_df():
+    """Test that downloading data for a ticker with no data returns an empty DataFrame (no exception)."""
     with patch("atlas_quant.data.downloader.yf.download") as mock_download:
         mock_download.return_value = pd.DataFrame()  # Empty DataFrame
-        with pytest.raises(DownloadError):
-            download_data("INVALIDTICKER123", "2024-01-01", "2024-01-31")
+        data = download_data("INVALID", "2024-01-01", "2024-01-31")
+        assert data.empty
+        # No exception raised
 
 def test_download_multiple_tickers():
     """Test downloading data for multiple tickers."""
@@ -49,15 +49,20 @@ def test_download_multiple_tickers():
         # Should have been called twice
         assert mock_download.call_count == 2
 
-def test_download_multiple_tickers_with_invalid():
-    """Test downloading multiple tickers with one invalid raises DownloadError."""
+def test_download_multiple_tickers_with_empty_returns():
+    """Test downloading multiple tickers where some return empty data."""
     def download_side_effect(ticker, start, end, interval):
-        if ticker == "INVALIDTICKER123":
-            return pd.DataFrame()  # Empty DataFrame for invalid ticker
+        if ticker == "INVALID":
+            return pd.DataFrame()  # Empty DataFrame
         return SAMPLE_DATA
 
     with patch("atlas_quant.data.downloader.yf.download") as mock_download:
         mock_download.side_effect = download_side_effect
-        tickers = ["AAPL", "INVALIDTICKER123"]
-        with pytest.raises(DownloadError):
-            download_multiple_tickers(tickers, "2024-01-01", "2024-01-31")
+        tickers = ["AAPL", "INVALID"]
+        data = download_multiple_tickers(tickers, "2024-01-01", "2024-01-31")
+        assert isinstance(data, dict)
+        assert "AAPL" in data
+        assert "INVALID" in data
+        assert not data["AAPL"].empty
+        assert data["INVALID"].empty
+        # No exception raised

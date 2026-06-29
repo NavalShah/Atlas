@@ -1,25 +1,25 @@
+"""
+Example script to download S&P 500 data.
+This script demonstrates how to use the MarketDataManager to get data for multiple tickers.
+"""
+
 import os
 import sys
 from pathlib import Path
 
-  # ----------------------------------------------------------------------
-  # Make sure we can import the `atlas_quant` package no matter where we run from
-  # ----------------------------------------------------------------------
-project_root = Path(__file__).resolve().parents[1]   # → D:\Quant
+# Add project root to sys.path so we can import atlas_quant
+project_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(project_root))
 
-  # ----------------------------------------------------------------------
-  # Change working directory to where the config/ folder lives
-  # ----------------------------------------------------------------------
+# Change working directory to project root (where config/ lives)
 os.chdir(project_root)
 
-  # Now the imports and config loading will work
 from atlas_quant.data.manager import MarketDataManager
 
 def main():
     manager = MarketDataManager()
 
-      # Example: Download data for a few S&P 500 stocks
+    # Example: Download data for a few S&P 500 stocks
     tickers = [
         "AAPL",
         "MSFT",
@@ -40,10 +40,6 @@ def main():
         print(f"Got {len(data[ticker])} rows for {ticker}")
         print(data[ticker].head())
         print("-" * 50)
-
-if __name__ == "__main__":
-    main()
-
 
 if __name__ == "__main__":
     main()
