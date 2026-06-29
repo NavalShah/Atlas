@@ -1,0 +1,13 @@
+data_provider: yahoo
+
+cache_directory: data/cache/
+
+default_start_date: 2010-01-01
+
+auto_update: true
+
+retry_attempts: 3
+
+retry_delay_seconds: 5
+
+log_level: INFO
