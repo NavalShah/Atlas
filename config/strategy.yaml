@@ -1,0 +1,23 @@
+strategy:
+  rebalance: weekly
+  portfolio_size: 20
+  cash_reserve: 0.10
+
+filters:
+  minimum_price: 10
+  minimum_volume: 500000
+  above_200_ma: true
+
+weights:
+  momentum: 0.35
+  trend: 0.25
+  relative_strength: 0.20
+  volume: 0.10
+  volatility: 0.10
+
+position_sizing:
+  method: equal_weight
+
+risk:
+  max_position_size: 0.08
+  max_sector_weight: 0.25
