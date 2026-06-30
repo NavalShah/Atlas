@@ -1,0 +1,233 @@
+﻿"""Momentum-based technical indicators."""
+
+import pandas as pd
+import numpy as np
+from typing import List
+from .base import BaseFeature
+
+
+class RSI(BaseFeature):
+    """Relative Strength Index (RSI).
+
+    The RSI measures the speed and change of price movements.
+
+    Formula:
+        RS = Average Gain / Average Loss
+        RSI = 100 - (100 / (1 + RS))
+
+    Args:
+        period: The lookback period for the average gain and loss (default: 14).
+        column: The column to use for calculations (default: 'Close').
+    """
+
+    def __init__(self, period: int = 14, column: str = 'Close'):
+        self.period = period
+        self.column = column
+        self._name = f'rsi_{period}'
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def category(self) -> str:
+        return 'momentum'
+
+    @property
+    def required_columns(self) -> List[str]:
+        return [self.column]
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [self.name]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        super().validate(dataframe)
+        # Need at least period+1 to compute the first RS (because we need period changes)
+        if len(dataframe) < self.period + 1:
+            raise ValueError(
+                f"Insufficient data: need at least {self.period + 1} rows, got {len(dataframe)}"
+            )
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        # Calculate price changes
+        delta = df[self.column].diff()
+        # Separate gains and losses
+        gain = delta.where(delta > 0, 0.0)
+        loss = -delta.where(delta < 0, 0.0)
+        # Calculate average gain and loss over the period
+        avg_gain = gain.rolling(window=self.period).mean()
+        avg_loss = loss.rolling(window=self.period).mean()
+        # Avoid division by zero
+        rs = avg_gain / avg_loss.replace(0, np.nan)
+        rsi = 100 - (100 / (1 + rs))
+        df[self.name] = rsi
+        return df
+
+
+class ROC(BaseFeature):
+    """Rate of Change (ROC).
+
+    The ROC measures the percentage change in price over a specified period.
+
+    Formula:
+        ROC = (Current Price - Price n periods ago) / (Price n periods ago) * 100
+
+    Args:
+        period: The lookback period (default: 20).
+        column: The column to use for calculations (default: 'Close').
+    """
+
+    def __init__(self, period: int = 20, column: str = 'Close'):
+        self.period = period
+        self.column = column
+        self._name = f'roc_{period}'
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def category(self) -> str:
+        return 'momentum'
+
+    @property
+    def required_columns(self) -> List[str]:
+        return [self.column]
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [self.name]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        super().validate(dataframe)
+        if len(dataframe) < self.period + 1:
+            raise ValueError(
+                f"Insufficient data: need at least {self.period + 1} rows, got {len(dataframe)}"
+            )
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        df[self.name] = (df[self.column] - df[self.column].shift(self.period)) / df[self.column].shift(self.period) * 100.0
+        return df
+
+
+class Momentum(BaseFeature):
+    """Momentum.
+
+    The Momentum indicator measures the change in price over a specified period.
+
+    Formula:
+        Momentum = Current Price - Price n periods ago
+
+    Args:
+        period: The lookback period (default: 20).
+        column: The column to use for calculations (default: 'Close').
+    """
+
+    def __init__(self, period: int = 20, column: str = 'Close'):
+        self.period = period
+        self.column = column
+        self._name = f'momentum_{period}'
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def category(self) -> str:
+        return 'momentum'
+
+    @property
+    def required_columns(self) -> List[str]:
+        return [self.column]
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [self.name]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        super().validate(dataframe)
+        if len(dataframe) < self.period + 1:
+            raise ValueError(
+                f"Insufficient data: need at least {self.period + 1} rows, got {len(dataframe)}"
+            )
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        df[self.name] = df[self.column] - df[self.column].shift(self.period)
+        return df
+
+
+class StochasticOscillator(BaseFeature):
+    """Stochastic Oscillator.
+
+    The Stochastic Oscillator compares a security's closing price to its price range over a given time period.
+
+    The indicator consists of two lines:
+        %K = (Current Close - Lowest Low) / (Highest High - Lowest Low) * 100
+        %D = SMA of %K
+
+    Args:
+        k_period: The lookback period for %K (default: 14).
+        d_period: The smoothing period for %D (default: 3).
+        column: The column to use for calculations (default: 'Close').
+        high_column: The column for high prices (default: 'High').
+        low_column: The column for low prices (default: 'Low').
+    """
+
+    def __init__(
+        self,
+        k_period: int = 14,
+        d_period: int = 3,
+        column: str = 'Close',
+        high_column: str = 'High',
+        low_column: str = 'Low'
+    ):
+        self.k_period = k_period
+        self.d_period = d_period
+        self.column = column
+        self.high_column = high_column
+        self.low_column = low_column
+        self._name = f'stoch_{k_period}_{d_period}'
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def category(self) -> str:
+        return 'momentum'
+
+    @property
+    def required_columns(self) -> List[str]:
+        return [self.column, self.high_column, self.low_column]
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [
+            f'{self._name}_k',   # %K
+            f'{self._name}_d'    # %D
+        ]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        super().validate(dataframe)
+        # Need enough data for the lookback period
+        if len(dataframe) < self.k_period:
+            raise ValueError(
+                f"Insufficient data: need at least {self.k_period} rows, got {len(dataframe)}"
+            )
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        # Calculate the lowest low and highest high over the lookback period
+        lowest_low = df[self.low_column].rolling(window=self.k_period).min()
+        highest_high = df[self.high_column].rolling(window=self.k_period).max()
+        # Calculate %K
+        df[f'{self._name}_k'] = (
+            (df[self.column] - lowest_low) / (highest_high - lowest_low)
+        ) * 100
+        # Calculate %D as SMA of %K
+        df[f'{self._name}_d'] = df[f'{self._name}_k'].rolling(window=self.d_period).mean()
+        return df

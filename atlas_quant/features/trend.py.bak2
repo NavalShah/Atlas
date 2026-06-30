@@ -1,0 +1,556 @@
+"""Trend-based technical indicators."""
+
+import pandas as pd
+import numpy as np
+from typing import List
+from .base import BaseFeature
+
+
+class SMA(BaseFeature):
+    """Simple Moving Average (SMA).
+
+    The SMA is the average price over a specified period.
+
+    Formula:
+        SMA = (P1 + P2 + ... + Pn) / n
+
+    where P is the price (usually close) and n is the period.
+
+    Args:
+        period: The number of periods to include in the average.
+        column: The column to use for calculations (default: 'Close').
+    """
+
+    def __init__(self, period: int = 20, column: str = 'Close'):
+        self.period = period
+        self.column = column
+        self._name = f'sma_{period}'
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def category(self) -> str:
+        return 'trend'
+
+    @property
+    def required_columns(self) -> List[str]:
+        return [self.column]
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [self.name]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        super().validate(dataframe)
+        if len(dataframe) < self.period:
+            raise ValueError(f"Insufficient data: need at least {self.period} rows, got {len(dataframe)}")
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        df[self.name] = df[self.column].rolling(window=self.period).mean()
+        return df
+
+
+class EMA(BaseFeature):
+    """Exponential Moving Average (EMA).
+
+    The EMA gives more weight to recent prices.
+
+    Formula:
+        EMA_t = (V_t * (s / (1 + d))) + EMA_y * [1 - (s / (1 + d))]
+
+    where:
+        V_t = current period\'s value
+        EMA_y = previous period\'s EMA
+        s = smoothing factor (usually 2)
+        d = number of periods
+
+    Args:
+        period: The number of periods for the average.
+        column: The column to use for calculations (default: 'Close').
+    """
+
+    def __init__(self, period: int = 20, column: str = 'Close'):
+        self.period = period
+        self.column = column
+        self._name = f'ema_{period}'
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def category(self) -> str:
+        return 'trend'
+
+    @property
+    def required_columns(self) -> List[str]:
+        return [self.column]
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [self.name]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        super().validate(dataframe)
+        if len(dataframe) < self.period:
+            raise ValueError(f"Insufficient data: need at least {self.period} rows, got {len(dataframe)}")
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        df[self.name] = df[self.column].ewm(span=self.period, adjust=False).mean()
+        return df
+
+
+class WMA(BaseFeature):
+    """Weighted Moving Average (WMA).
+
+    The WMA gives more weight to recent data, with weights decreasing arithmetically.
+
+    Formula:
+        WMA = (P1 * n + P2 * (n-1) + ... + Pn * 1) / (n + (n-1) + ... + 1)
+
+    where P is the price and n is the period.
+
+    Args:
+        period: The number of periods to include in the average.
+        column: The column to use for calculations (default: 'Close').
+    """
+
+    def __init__(self, period: int = 20, column: str = 'Close'):
+        self.period = period
+        self.column = column
+        self._name = f'wma_{period}'
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def category(self) -> str:
+        return 'trend'
+
+    @property
+    def required_columns(self) -> List[str]:
+        return [self.column]
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [self.name]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        super().validate(dataframe)
+        if len(dataframe) < self.period:
+            raise ValueError(f"Insufficient data: need at least {self.period} rows, got {len(dataframe)}")
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        weights = np.arange(1, self.period + 1)
+        df[self.name] = df[self.column].rolling(window=self.period).apply(
+            lambda prices: np.dot(prices, weights) / weights.sum(), raw=True
+        )
+        return df
+
+
+class MACD(BaseFeature):
+    """Moving Average Convergence Divergence (MACD).
+
+    The MACD is a trend-following momentum indicator that shows the relationship
+    between two moving averages of a security\'s price.
+
+    The MACD is calculated by subtracting the 26-period EMA from the 12-period EMA.
+    A 9-period EMA of the MACD is called the signal line.
+
+    Args:
+        fast_period: The period for the fast EMA (default: 12).
+        slow_period: The period for the slow EMA (default: 26).
+        signal_period: The period for the signal line EMA (default: 9).
+        column: The column to use for calculations (default: 'Close').
+    """
+
+    def __init__(self, fast_period: int = 12, slow_period: int = 26, signal_period: int = 9, column: str = 'Close'):
+        self.fast_period = fast_period
+        self.slow_period = slow_period
+        self.signal_period = signal_period
+        self.column = column
+        self._name = f'macd_{fast_period}_{slow_period}_{signal_period}'
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def category(self) -> str:
+        return 'trend'
+
+    @property
+    def required_columns(self) -> List[str]:
+        return [self.column]
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [
+            self.name,               # MACD line
+            f'{self._name}_signal',   # Signal line
+            f'{self._name}_histogram' # MACD histogram
+        ]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        super().validate(dataframe)
+        # We need enough data for the slow EMA and the signal EMA
+        required = max(self.slow_period, self.signal_period) + self.fast_period
+        if len(dataframe) < required:
+            raise ValueError(
+                f"Insufficient data: need at least {required} rows, got {len(dataframe)}"
+            )
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        # Calculate the fast and slow EMAs
+        ema_fast = df[self.column].ewm(span=self.fast_period, adjust=False).mean()
+        ema_slow = df[self.column].ewm(span=self.slow_period, adjust=False).mean()
+        # MACD line
+        macd_line = ema_fast - ema_slow
+        # Signal line
+        signal_line = macd_line.ewm(span=self.signal_period, adjust=False).mean()
+        # MACD histogram
+        macd_hist = macd_line - signal_line
+        # Assign to dataframe
+        df[self.name] = macd_line
+        df[f'{self._name}_signal'] = signal_line
+        df[f'{self._name}_histogram'] = macd_hist
+        return df
+
+
+class MovingAverageDistance(BaseFeature):
+    """Distance between price and a moving average.
+
+    Calculates the normalized distance: (price - MA) / MA.
+
+    Args:
+        period: The period for the moving average.
+        ma_type: The type of moving average ('sma', 'ema', 'wma').
+        column: The column to use for calculations (default: 'Close').
+    """
+
+    def __init__(self, period: int = 20, ma_type: str = 'sma', column: str = 'Close'):
+        self.period = period
+        self.ma_type = ma_type.lower()
+        self.column = column
+        self._name = f'{ma_type}_distance_{period}'
+
+        # Create the moving average feature internally
+        if self.ma_type == 'sma':
+            self._ma = SMA(period=period, column=column)
+        elif self.ma_type == 'ema':
+            self._ma = EMA(period=period, column=column)
+        elif self.ma_type == 'wma':
+            self._ma = WMA(period=period, column=column)
+        else:
+            raise ValueError(f"Unsupported ma_type: {ma_type}")
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def category(self) -> str:
+        return 'trend'
+
+    @property
+    def required_columns(self) -> List[str]:
+        return [self.column]
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [self.name]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        # Delegate to the MA\'s validation
+        self._ma.validate(dataframe)
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        # Calculate the MA
+        df_ma = self._ma.calculate(df)
+        ma_col = self._ma.name
+        # Calculate the distance
+        df[self.name] = (df[self.column] - df_ma[ma_col]) / df_ma[ma_col]
+        return df
+
+
+class MovingAverageSlope(BaseFeature):
+    """Slope of a moving average.
+
+    Calculates the slope as the difference between consecutive MA values.
+
+    Args:
+        period: The period for the moving average.
+        ma_type: The type of moving average (\'sma\', \'ema\', \'wma\').
+        column: The column to use for calculations (default: \'Close\').
+    """
+
+    def __init__(self, period: int = 20, ma_type: str = 'sma', column: str = 'Close'):
+        self.period = period
+        self.ma_type = ma_type.lower()
+        self.column = column
+        self._name = f'{ma_type}_slope_{period}'
+
+        # Create the moving average feature internally
+        if self.ma_type == 'sma':
+            self._ma = SMA(period=period, column=column)
+        elif self.ma_type == 'ema':
+            self._ma = EMA(period=period, column=column)
+        elif self.ma_type == 'wma':
+            self._ma = WMA(period=period, column=column)
+        else:
+            raise ValueError(f"Unsupported ma_type: {ma_type}")
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def category(self) -> str:
+        return 'trend'
+
+    @property
+    def required_columns(self) -> List[str]:
+        return [self.column]
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [self.name]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        # The MA needs at least period data, and we need at least 2 points to compute slope
+        self._ma.validate(dataframe)
+        if len(dataframe) < self._ma.period + 1:
+            raise ValueError(
+                f"Insufficient data for slope: need at least {self._ma.period + 1} rows, got {len(dataframe)}"
+            )
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        # Calculate the MA
+        df_ma = self._ma.calculate(df)
+        ma_col = self._ma.name
+        # Calculate the slope (difference)
+        df[self.name] = df_ma[ma_col].diff()
+        return df
+
+
+class PriceAboveMA(BaseFeature):
+    """Indicator showing whether the price is above a moving average.
+
+    Returns 1.0 if price > MA, 0.0 otherwise.
+
+    Args:
+        period: The period for the moving average.
+        ma_type: The type of moving average (\'sma\', \'ema\', \'wma\').
+        column: The column to use for calculations (default: \'Close\').
+    """
+
+    def __init__(self, period: int = 20, ma_type: str = 'sma', column: str = 'Close'):
+        self.period = period
+        self.ma_type = ma_type.lower()
+        self.column = column
+        self._name = f'{ma_type}_above_{period}'
+
+        # Create the moving average feature internally
+        if self.ma_type == 'sma':
+            self._ma = SMA(period=period, column=column)
+        elif self.ma_type == 'ema':
+            self._ma = EMA(period=period, column=column)
+        elif self.ma_type == 'wma':
+            self._ma = WMA(period=period, column=column)
+        else:
+            raise ValueError(f"Unsupported ma_type: {ma_type}")
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def category(self) -> str:
+        return 'trend'
+
+    @property
+    def required_columns(self) -> List[str]:
+        return [self.column]
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [self.name]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        # Delegate to the MA\'s validation
+        self._ma.validate(dataframe)
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        # Calculate the MA
+        df_ma = self._ma.calculate(df)
+        ma_col = self._ma.name
+        # Calculate the indicator
+        df[self.name] = (df[self.column] > df_ma[ma_col]).astype(float)
+        return df
+
+
+class GoldenCross(BaseFeature):
+    """Golden Cross: when a short-term MA crosses above a long-term MA.
+
+    Args:
+        short_period: The period for the short-term MA.
+        long_period: The period for the long-term MA.
+        ma_type: The type of moving average (\'sma\', \'ema\', \'wma\').
+        column: The column to use for calculations (default: \'Close\').
+    """
+
+    def __init__(
+        self,
+        short_period: int = 50,
+        long_period: int = 200,
+        ma_type: str = 'sma',
+        column: str = 'Close'
+    ):
+        self.short_period = short_period
+        self.long_period = long_period
+        self.ma_type = ma_type.lower()
+        self.column = column
+        self._name = f'golden_cross_{ma_type}_{short_period}_{long_period}'
+
+        # Create the moving average features internally
+        if self.ma_type == 'sma':
+            self._ma_short = SMA(period=short_period, column=column)
+            self._ma_long = SMA(period=long_period, column=column)
+        elif self.ma_type == 'ema':
+            self._ma_short = EMA(period=short_period, column=column)
+            self._ma_long = EMA(period=long_period, column=column)
+        elif self.ma_type == 'wma':
+            self._ma_short = WMA(period=short_period, column=column)
+            self._ma_long = WMA(period=long_period, column=column)
+        else:
+            raise ValueError(f"Unsupported ma_type: {ma_type}")
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def category(self) -> str:
+        return 'trend'
+
+    @property
+    def required_columns(self) -> List[str]:
+        return [self.column]
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [self.name]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        # Both MAs need sufficient data
+        self._ma_short.validate(dataframe)
+        self._ma_long.validate(dataframe)
+        # We need at least one more point to detect a crossover
+        min_len = max(self._ma_short.period, self._ma_long.period) + 1
+        if len(dataframe) < min_len:
+            raise ValueError(
+                f"Insufficient data for crossover: need at least {min_len} rows, got {len(dataframe)}"
+            )
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        # Calculate the short and long MAs
+        df_short = self._ma_short.calculate(df)
+        df_long = self._ma_long.calculate(df)
+        short_col = self._ma_short.name
+        long_col = self._ma_long.name
+        # Determine where the short MA is above the long MA
+        ma_diff = df_short[short_col] - df_long[long_col]
+        # Golden cross: previous difference <= 0 and current difference > 0
+        golden = (ma_diff.shift(1) <= 0) & (ma_diff > 0)
+        df[self.name] = golden.astype(float)
+        return df
+
+
+class DeathCross(BaseFeature):
+    """Death Cross: when a short-term MA crosses below a long-term MA.
+
+    Args:
+        short_period: The period for the short-term MA.
+        long_period: The period for the long-term MA.
+        ma_type: The type of moving average (\'sma\', \'ema\', \'wma\').
+        column: The column to use for calculations (default: \'Close\').
+    """
+
+    def __init__(
+        self,
+        short_period: int = 50,
+        long_period: int = 200,
+        ma_type: str = 'sma',
+        column: str = 'Close'
+    ):
+        self.short_period = short_period
+        self.long_period = long_period
+        self.ma_type = ma_type.lower()
+        self.column = column
+        self._name = f'death_cross_{ma_type}_{short_period}_{long_period}'
+
+        # Create the moving average features internally
+        if self.ma_type == 'sma':
+            self._ma_short = SMA(period=short_period, column=column)
+            self._ma_long = SMA(period=long_period, column=column)
+        elif self.ma_type == 'ema':
+            self._ma_short = EMA(period=short_period, column=column)
+            self._ma_long = EMA(period=long_period, column=column)
+        elif self.ma_type == 'wma':
+            self._ma_short = WMA(period=short_period, column=column)
+            self._ma_long = WMA(period=long_period, column=column)
+        else:
+            raise ValueError(f"Unsupported ma_type: {ma_type}")
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def category(self) -> str:
+        return 'trend'
+
+    @property
+    def required_columns(self) -> List[str]:
+        return [self.column]
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [self.name]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        # Both MAs need sufficient data
+        self._ma_short.validate(dataframe)
+        self._ma_long.validate(dataframe)
+        # We need at least one more point to detect a crossover
+        min_len = max(self._ma_short.period, self._ma_long.period) + 1
+        if len(dataframe) < min_len:
+            raise ValueError(
+                f"Insufficient data for crossover: need at least {min_len} rows, got {len(dataframe)}"
+            )
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        # Calculate the short and long MAs
+        df_short = self._ma_short.calculate(df)
+        df_long = self._ma_long.calculate(df)
+        short_col = self._ma_short.name
+        long_col = self._ma_long.name
+        # Determine where the short MA is below the long MA
+        ma_diff = df_short[short_col] - df_long[long_col]
+        # Death cross: previous difference >= 0 and current difference < 0
+        death = (ma_diff.shift(1) >= 0) & (ma_diff < 0)
+        df[self.name] = death.astype(float)
+        return df
+

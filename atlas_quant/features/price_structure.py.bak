@@ -1,0 +1,492 @@
+﻿"""Price structure features."""
+
+import pandas as pd
+import numpy as np
+from typing import List
+from .base import BaseFeature
+
+
+class DailyReturn(BaseFeature):
+    """Daily Return.
+
+    The daily return is the percentage change in closing price from the previous day.
+
+    Formula:
+        Daily Return = (Close_t - Close_{t-1}) / Close_{t-1}
+
+    Or equivalently: (Close_t / Close_{t-1}) - 1
+
+    Args:
+        column: The column to use for calculations (default: 'Close').
+    """
+
+    def __init__(self, column: str = 'Close'):
+        self.column = column
+        self._name = 'daily_return'
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def category(self) -> str:
+        return 'price_structure'
+
+    @property
+    def required_columns(self) -> List[str]:
+        return [self.column]
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [self.name]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        super().validate(dataframe)
+        if len(dataframe) < 2:
+            raise ValueError("Insufficient data: need at least 2 rows to compute daily return")
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        df[self.name] = df[self.column].pct_change()
+        return df
+
+
+class LogReturn(BaseFeature):
+    """Log Return.
+
+    The log return is the natural logarithm of the ratio of consecutive closing prices.
+
+    Formula:
+        Log Return = ln(Close_t / Close_{t-1})
+
+    Args:
+        column: The column to use for calculations (default: 'Close').
+    """
+
+    def __init__(self, column: str = 'Close'):
+        self.column = column
+        self._name = 'log_return'
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def category(self) -> str:
+        return 'price_structure'
+
+    @property
+    def required_columns(self) -> List[str]:
+        return [self.column]
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [self.name]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        super().validate(dataframe)
+        if len(dataframe) < 2:
+            raise ValueError("Insufficient data: need at least 2 rows to compute log return")
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        df[self.name] = np.log(df[self.column] / df[self.column].shift(1))
+        return df
+
+
+class IntradayReturn(BaseFeature):
+    """Intraday Return.
+
+    The intraday return is the return from open to close within a single day.
+
+    Formula:
+        Intraday Return = (Close - Open) / Open
+
+    Args:
+        open_column: The column to use for open price (default: 'Open').
+        close_column: The column to use for close price (default: 'Close').
+    """
+
+    def __init__(self, open_column: str = 'Open', close_column: str = 'Close'):
+        self.open_column = open_column
+        self.close_column = close_column
+        self._name = 'intraday_return'
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def category(self) -> str:
+        return 'price_structure'
+
+    @property
+    def required_columns(self) -> List[str]:
+        return [self.open_column, self.close_column]
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [self.name]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        super().validate(dataframe)
+        if len(dataframe) < 1:
+            raise ValueError("Insufficient data: need at least 1 row to compute intraday return")
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        df[self.name] = (df[self.close_column] - df[self.open_column]) / df[self.open_column]
+        return df
+
+
+class Gap(BaseFeature):
+    """Gap %.
+
+    The gap percentage is the difference between the current open and the previous close, divided by the previous close.
+
+    Formula:
+        Gap % = (Open_t - Close_{t-1}) / Close_{t-1}
+
+    Args:
+        open_column: The column to use for open price (default: 'Open').
+        close_column: The column to use for close price (default: 'Close').
+    """
+
+    def __init__(self, open_column: str = 'Open', close_column: str = 'Close'):
+        self.open_column = open_column
+        self.close_column = close_column
+        self._name = 'gap'
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def category(self) -> str:
+        return 'price_structure'
+
+    @property
+    def required_columns(self) -> List[str]:
+        return [self.open_column, self.close_column]
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [self.name]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        super().validate(dataframe)
+        if len(dataframe) < 2:
+            raise ValueError("Insufficient data: need at least 2 rows to compute gap")
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        df[self.name] = (df[self.open_column] - df[self.close_column].shift(1)) / df[self.close_column].shift(1)
+        return df
+
+
+class CandleBody(BaseFeature):
+    """Candle Body %.
+
+    The candle body percentage is the absolute difference between open and close, divided by the high-low range.
+
+    Formula:
+        Candle Body % = |Close - Open| / (High - Low)
+
+    Args:
+        open_column: The column to use for open price (default: 'Open').
+        high_column: The column to use for high price (default: 'High').
+        low_column: The column to use for low price (default: 'Low').
+        close_column: The column to use for close price (default: 'Close').
+    """
+
+    def __init__(self, open_column: str = 'Open', high_column: str = 'High', low_column: str = 'Low', close_column: str = 'Close'):
+        self.open_column = open_column
+        self.high_column = high_column
+        self.low_column = low_column
+        self.close_column = close_column
+        self._name = 'candle_body'
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def category(self) -> str:
+        return 'price_structure'
+
+    @property
+    def required_columns(self) -> List[str]:
+        return [self.open_column, self.high_column, self.low_column, self.close_column]
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [self.name]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        super().validate(dataframe)
+        if len(dataframe) < 1:
+            raise ValueError("Insufficient data: need at least 1 row to compute candle body")
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        body = abs(df[self.close_column] - df[self.open_column])
+        range_ = df[self.high_column] - df[self.low_column]
+        # Avoid division by zero
+        df[self.name] = body / (range_.replace(0, np.nan))
+        return df
+
+
+class UpperWick(BaseFeature):
+    """Upper Wick %.
+
+    The upper wick percentage is the difference between the high and the closer of open or close, divided by the high-low range.
+
+    Formula:
+        Upper Wick % = (High - max(Open, Close)) / (High - Low)
+
+    Args:
+        open_column: The column to use for open price (default: 'Open').
+        high_column: The column to use for high price (default: 'High').
+        low_column: The column to use for low price (default: 'Low').
+        close_column: The column to use for close price (default: 'Close').
+    """
+
+    def __init__(self, open_column: str = 'Open', high_column: str = 'High', low_column: str = 'Low', close_column: str = 'Close'):
+        self.open_column = open_column
+        self.high_column = high_column
+        self.low_column = low_column
+        self.close_column = close_column
+        self._name = 'upper_wick'
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def category(self) -> str:
+        return 'price_structure'
+
+    @property
+    def required_columns(self) -> List[str]:
+        return [self.open_column, self.high_column, self.low_column, self.close_column]
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [self.name]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        super().validate(dataframe)
+        if len(dataframe) < 1:
+            raise ValueError("Insufficient data: need at least 1 row to compute upper wick")
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        upper_wick = df[self.high_column] - np.maximum(df[self.open_column], df[self.close_column])
+        range_ = df[self.high_column] - df[self.low_column]
+        # Avoid division by zero
+        df[self.name] = upper_wick / (range_.replace(0, np.nan))
+        return df
+
+
+class LowerWick(BaseFeature):
+    """Lower Wick %.
+
+    The lower wick percentage is the difference between the lower of open or close and the low, divided by the high-low range.
+
+    Formula:
+        Lower Wick % = (min(Open, Close) - Low) / (High - Low)
+
+    Args:
+        open_column: The column to use for open price (default: 'Open').
+        high_column: The column to use for high price (default: 'High').
+        low_column: The column to use for low price (default: 'Low').
+        close_column: The column to use for close price (default: 'Close').
+    """
+
+    def __init__(self, open_column: str = 'Open', high_column: str = 'High', low_column: str = 'Low', close_column: str = 'Close'):
+        self.open_column = open_column
+        self.high_column = high_column
+        self.low_column = low_column
+        self.close_column = close_column
+        self._name = 'lower_wick'
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def category(self) -> str:
+        return 'price_structure'
+
+    @property
+    def required_columns(self) -> List[str]:
+        return [self.open_column, self.high_column, self.low_column, self.close_column]
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [self.name]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        super().validate(dataframe)
+        if len(dataframe) < 1:
+            raise ValueError("Insufficient data: need at least 1 row to compute lower wick")
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        lower_wick = np.minimum(df[self.open_column], df[self.close_column]) - df[self.low_column]
+        range_ = df[self.high_column] - df[self.low_column]
+        # Avoid division by zero
+        df[self.name] = lower_wick / (range_.replace(0, np.nan))
+        return df
+
+
+class RangePercent(BaseFeature):
+    """Range %.
+
+    The range percentage is the high-low range divided by the previous close.
+
+    Formula:
+        Range % = (High - Low) / Close_{t-1}
+
+    Args:
+        high_column: The column to use for high price (default: 'High').
+        low_column: The column to use for low price (default: 'Low').
+        close_column: The column to use for close price (default: 'Close').
+    """
+
+    def __init__(self, high_column: str = 'High', low_column: str = 'Low', close_column: str = 'Close'):
+        self.high_column = high_column
+        self.low_column = low_column
+        self.close_column = close_column
+        self._name = 'range_percent'
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def category(self) -> str:
+        return 'price_structure'
+
+    @property
+    def required_columns(self) -> List[str]:
+        return [self.high_column, self.low_column, self.close_column]
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [self.name]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        super().validate(dataframe)
+        if len(dataframe) < 2:
+            raise ValueError("Insufficient data: need at least 2 rows to compute range percent")
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        range_ = df[self.high_column] - df[self.low_column]
+        prev_close = df[self.close_column].shift(1)
+        # Avoid division by zero
+        df[self.name] = range_ / (prev_close.replace(0, np.nan))
+        return df
+
+
+class DistanceTo52WeekHigh(BaseFeature):
+    """Distance to 52-week High.
+
+    The distance to the 52-week high is the difference between the 52-week high and the current close, divided by the 52-week high.
+
+    Formula:
+        Distance to 52-week High = (52week High - Close) / 52week High
+
+    Args:
+        high_column: The column to use for high price (default: 'High').
+        close_column: The column to use for close price (default: 'Close').
+        window: The lookback window for the 52-week high (default: 252 trading days).
+    """
+
+    def __init__(self, high_column: str = 'High', close_column: str = 'Close', window: int = 252):
+        self.high_column = high_column
+        self.close_column = close_column
+        self.window = window
+        self._name = f'distance_to_52w_high_{window}'
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def category(self) -> str:
+        return 'price_structure'
+
+    @property
+    def required_columns(self) -> List[str]:
+        return [self.high_column, self.close_column]
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [self.name]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        super().validate(dataframe)
+        if len(dataframe) < self.window:
+            raise ValueError(
+                f"Insufficient data: need at least {self.window} rows to compute {self.name}"
+            )
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        rolling_max = df[self.high_column].rolling(window=self.window).max()
+        # Avoid division by zero
+        df[self.name] = (rolling_max - df[self.close_column]) / (rolling_max.replace(0, np.nan))
+        return df
+
+
+class DistanceTo52WeekLow(BaseFeature):
+    """Distance to 52-week Low.
+
+    The distance to the 52-week low is the difference between the current close and the 52-week low, divided by the 52-week low.
+
+    Formula:
+        Distance to 52-week Low = (Close - 52week Low) / 52week Low
+
+    Args:
+        low_column: The column to use for low price (default: 'Low').
+        close_column: The column to use for close price (default: 'Close').
+        window: The lookback window for the 52-week low (default: 252 trading days).
+    """
+
+    def __init__(self, low_column: str = 'Low', close_column: str = 'Close', window: int = 252):
+        self.low_column = low_column
+        self.close_column = close_column
+        self.window = window
+        self._name = f'distance_to_52w_low_{window}'
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def category(self) -> str:
+        return 'price_structure'
+
+    @property
+    def required_columns(self) -> List[str]:
+        return [self.low_column, self.close_column]
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [self.name]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        super().validate(dataframe)
+        if len(dataframe) < self.window:
+            raise ValueError(
+                f"Insufficient data: need at least {self.window} rows to compute {self.name}"
+            )
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        rolling_min = df[self.low_column].rolling(window=self.window).min()
+        # Avoid division by zero
+        df[self.name] = (df[self.close_column] - rolling_min) / (rolling_min.replace(0, np.nan))
+        return df

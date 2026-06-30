@@ -1,0 +1,185 @@
+﻿"""Volatility-based technical indicators."""
+
+import pandas as pd
+import numpy as np
+from typing import List
+from .base import BaseFeature
+
+
+class ATR(BaseFeature):
+    """Average True Range (ATR).
+
+    The ATR measures market volatility by decomposing the entire range of an asset price for that period.
+
+    True Range (TR) is defined as the greatest of the following:
+        - Current High - Current Low
+        - |Current High - Previous Close|
+        - |Current Low - Previous Close|
+
+    ATR is the moving average of the TR, typically over 14 periods.
+
+    Args:
+        period: The lookback period for the average (default: 14).
+    """
+
+    def __init__(self, period: int = 14):
+        self.period = period
+        self._name = f'atr_{period}'
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def category(self) -> str:
+        return 'volatility'
+
+    @property
+    def required_columns(self) -> List[str]:
+        return ['High', 'Low', 'Close']
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [self.name]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        super().validate(dataframe)
+        # Need period+1 for the first TR (because we need previous close)
+        if len(dataframe) < self.period + 1:
+            raise ValueError(
+                f"Insufficient data: need at least {self.period + 1} rows, got {len(dataframe)}"
+            )
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        # Calculate True Range
+        high_low = df['High'] - df['Low']
+        high_close = np.abs(df['High'] - df['Close'].shift())
+        low_close = np.abs(df['Low'] - df['Close'].shift())
+        tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+        # Calculate ATR
+        df[self.name] = tr.rolling(window=self.period).mean()
+        return df
+
+
+class HistoricalVolatility(BaseFeature):
+    """Historical Volatility.
+
+    The historical volatility is the standard deviation of logarithmic returns over a specified period.
+
+    Formula:
+        HV = std(log(P_t / P_{t-1})) * sqrt(trading_days_per_year) * 100
+
+    Args:
+        period: The lookback period for the standard deviation (default: 20).
+        trading_days: Number of trading days in a year for annualization (default: 252).
+        column: The column to use for returns (default: 'Close').
+    """
+
+    def __init__(self, period: int = 20, trading_days: int = 252, column: str = 'Close'):
+        self.period = period
+        self.trading_days = trading_days
+        self.column = column
+        self._name = f'volatility_{period}'
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def category(self) -> str:
+        return 'volatility'
+
+    @property
+    def required_columns(self) -> List[str]:
+        return [self.column]
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [self.name]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        super().validate(dataframe)
+        # Need at least period+1 to compute returns and then the std
+        if len(dataframe) < self.period + 1:
+            raise ValueError(
+                f"Insufficient data: need at least {self.period + 1} rows, got {len(dataframe)}"
+            )
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        # Calculate log returns
+        log_returns = np.log(df[self.column] / df[self.column].shift(1))
+        # Calculate rolling standard deviation
+        volatility = log_returns.rolling(window=self.period).std() * np.sqrt(self.trading_days) * 100
+        df[self.name] = volatility
+        return df
+
+
+class BollingerBands(BaseFeature):
+    """Bollinger Bands.
+
+    Bollinger Bands consist of a middle band (SMA) and two outer bands that are
+    standard deviations away from the middle band.
+
+    Formulas:
+        Middle Band = SMA(period)
+        Upper Band = Middle Band + (std_dev * std_multiplier)
+        Lower Band = Middle Band - (std_dev * std_multiplier)
+
+    Args:
+        period: The lookback period for the SMA and standard deviation (default: 20).
+        std_multiplier: The number of standard deviations for the bands (default: 2).
+        column: The column to use for calculations (default: 'Close').
+    """
+
+    def __init__(self, period: int = 20, std_multiplier: float = 2.0, column: str = 'Close'):
+        self.period = period
+        self.std_multiplier = std_multiplier
+        self.column = column
+        self._base_name = f'bb_{period}_{std_multiplier}'
+
+    @property
+    def name(self) -> str:
+        return self._base_name
+
+    @property
+    def category(self) -> str:
+        return 'volatility'
+
+    @property
+    def required_columns(self) -> List[str]:
+        return [self.column]
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [
+            f'{self._base_name}_middle',
+            f'{self._base_name}_upper',
+            f'{self._base_name}_lower',
+            f'{self._base_name}_width'
+        ]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        super().validate(dataframe)
+        if len(dataframe) < self.period:
+            raise ValueError(
+                f"Insufficient data: need at least {self.period} rows, got {len(dataframe)}"
+            )
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        # Calculate the middle band (SMA)
+        ma = df[self.column].rolling(window=self.period).mean()
+        # Calculate the rolling standard deviation
+        std_dev = df[self.column].rolling(window=self.period).std()
+        # Upper and lower bands
+        upper = ma + (self.std_multiplier * std_dev)
+        lower = ma - (self.std_multiplier * std_dev)
+        # Band width
+        width = (upper - lower) / ma
+        df[f'{self._base_name}_middle'] = ma
+        df[f'{self._base_name}_upper'] = upper
+        df[f'{self._base_name}_lower'] = lower
+        df[f'{self._base_name}_width'] = width
+        return df

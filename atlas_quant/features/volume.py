@@ -1,0 +1,289 @@
+﻿"""Volume-based technical indicators."""
+
+import pandas as pd
+import numpy as np
+from typing import List
+from .base import BaseFeature
+
+
+class VolumeSMA(BaseFeature):
+    """Volume Simple Moving Average (SMA).
+
+    The SMA of volume over a specified period.
+
+    Args:
+        period: The number of periods for the average (default: 20).
+        column: The column to use for calculations (default: 'Volume').
+    """
+
+    feature_key = 'volume_sma'
+
+    def __init__(self, period: int = 20, column: str = 'Volume'):
+        self.period = period
+        self.column = column
+        self._name = f'volume_sma_{self.period}'
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    _category = 'volume'
+    @property
+    def category(self) -> str:
+        return self._category
+
+    @property
+    def required_columns(self) -> List[str]:
+        return [self.column]
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [self.name]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        super().validate(dataframe)
+        if len(dataframe) < self.period:
+            raise ValueError(f"Insufficient data: need at least {self.period} rows, got {len(dataframe)}")
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        df[self.name] = df[self.column].rolling(window=self.period).mean()
+        return df
+
+
+class RelativeVolume(BaseFeature):
+    """Relative Volume (RVOL).
+
+    The ratio of current volume to the average volume over a specified period.
+
+    Args:
+        period: The lookback period for the average volume (default: 20).
+        column: The column to use for calculations (default: 'Volume').
+    """
+
+    feature_key = 'relative_volume'
+
+    def __init__(self, period: int = 20, column: str = 'Volume'):
+        self.period = period
+        self.column = column
+        self._name = f'rvol_{self.period}'
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    _category = 'volume'
+    @property
+    def category(self) -> str:
+        return self._category
+
+    @property
+    def required_columns(self) -> List[str]:
+        return [self.column]
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [self.name]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        super().validate(dataframe)
+        if len(dataframe) < self.period + 1:
+            raise ValueError(f"Insufficient data: need at least {self.period + 1} rows, got {len(dataframe)}")
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        # Calculate the average volume
+        avg_volume = df[self.column].rolling(window=self.period).mean()
+        # Avoid division by zero
+        df[self.name] = df[self.column] / avg_volume.replace(0, np.nan)
+        return df
+
+
+class OnBalanceVolume(BaseFeature):
+    """On-Balance Volume (OBV).
+
+    OBV is a cumulative indicator that adds volume on up days and subtracts volume on down days.
+
+    Rules:
+        If today\'s close > previous close: OBV = Previous OBV + Current Volume
+        If today\'s close < previous close: OBV = Previous OBV - Current Volume
+        If today\'s close == previous close: OBV = Previous OBV
+
+    Args:
+        column: The column to use for price (default: 'Close').
+        volume_column: The column to use for volume (default: 'Volume').
+    """
+
+    feature_key = 'obv'
+
+    def __init__(self, column: str = 'Close', volume_column: str = 'Volume'):
+        self.column = column
+        self.volume_column = volume_column
+        self._name = 'obv'
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    _category = 'volume'
+    @property
+    def category(self) -> str:
+        return self._category
+
+    @property
+    def required_columns(self) -> List[str]:
+        return [self.column, self.volume_column]
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [self.name]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        super().validate(dataframe)
+        # No minimum period required, but we need at least 2 rows to compute the first change
+        if len(dataframe) < 2:
+            raise ValueError("Insufficient data: need at least 2 rows to compute OBV")
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        # Calculate price change
+        price_change = df[self.column].diff()
+        # Initialize OBV with the first volume
+        obv = [df[self.volume_column].iloc[0]]
+        # Iterate from the second row
+        for i in range(1, len(df)):
+            if price_change.iloc[i] > 0:  # Up day
+                obv.append(obv[-1] + df[self.volume_column].iloc[i])
+            elif price_change.iloc[i] < 0:  # Down day
+                obv.append(obv[-1] - df[self.volume_column].iloc[i])
+            else:  # Unchanged
+                obv.append(obv[-1])
+        df[self.name] = obv
+        return df
+
+
+class MoneyFlowIndex(BaseFeature):
+    """Money Flow Index (MFI).
+
+    The MFI is a volume-weighted RSI.
+
+    Steps:
+        1. Typical Price = (High + Low + Close) / 3
+        2. Money Flow = Typical Price * Volume
+        3. Positive Money Flow = Sum of Money Flow where Typical Price > Previous Typical Price
+        4. Negative Money Flow = Sum of Money Flow where Typical Price < Previous Typical Price
+        5. Money Ratio = Positive Money Flow / Negative Money Flow
+        6. MFI = 100 - (100 / (1 + Money Ratio))
+
+    Args:
+        period: The lookback period (default: 14).
+    """
+
+    feature_key = 'mfi'
+
+    def __init__(self, period: int = 14):
+        self.period = period
+        self._name = f'mfi_{self.period}'
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    _category = 'volume'
+    @property
+    def category(self) -> str:
+        return self._category
+
+    @property
+    def required_columns(self) -> List[str]:
+        return ['High', 'Low', 'Close', 'Volume']
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [self.name]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        super().validate(dataframe)
+        # Need period+1 for the first MFR calculation
+        if len(dataframe) < self.period + 1:
+            raise ValueError(f"Insufficient data: need at least {self.period + 1} rows, got {len(dataframe)}")
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        # Typical Price
+        tp = (df['High'] + df['Low'] + df['Close']) / 3
+        # Money Flow
+        mf = tp * df['Volume']
+        # Determine the direction of typical price change
+        tp_change = tp.diff()
+        # Positive Money Flow
+        pmf = mf.where(tp_change > 0, 0.0)
+        # Negative Money Flow
+        nmf = mf.where(tp_change < 0, 0.0)
+        # Sum over the period
+        sum_pmf = pmf.rolling(window=self.period).sum()
+        sum_nmf = nmf.rolling(window=self.period).sum()
+        # Money Ratio
+        mr = sum_pmf / sum_nmf.replace(0, np.nan)
+        # MFI
+        mfi = 100 - (100 / (1 + mr))
+        df[self.name] = mfi
+        return df
+
+
+class ChaikinMoneyFlow(BaseFeature):
+    """Chaikin Money Flow (CMF).
+
+    The CMF measures the amount of Money Flow Volume over a specific period.
+
+    Steps:
+        1. Money Flow Multiplier = [(Close - Low) - (High - Close)] / (High - Low)
+        2. Money Flow Volume = Money Flow Multiplier * Volume
+        3. CMF = (Sum of Money Flow Volume over period) / (Sum of Volume over period)
+
+    Args:
+        period: The lookback period (default: 20).
+    """
+
+    feature_key = 'cmf'
+
+    def __init__(self, period: int = 20):
+        self.period = period
+        self._name = f'cmf_{self.period}'
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    _category = 'volume'
+    @property
+    def category(self) -> str:
+        return self._category
+
+    @property
+    def required_columns(self) -> List[str]:
+        return ['High', 'Low', 'Close', 'Volume']
+
+    @property
+    def generated_columns(self) -> List[str]:
+        return [self.name]
+
+    def validate(self, dataframe: pd.DataFrame) -> None:
+        super().validate(dataframe)
+        if len(dataframe) < self.period:
+            raise ValueError(f"Insufficient data: need at least {self.period} rows, got {len(dataframe)}")
+
+    def calculate(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        df = dataframe.copy()
+        # Avoid division by zero in case high == low
+        high_low = df['High'] - df['Low']
+        # Where high_low is zero, set mfm to 0 (or handle as needed)
+        mfm = ((df['Close'] - df['Low']) - (df['High'] - df['Close'])) / high_low.replace(0, np.nan)
+        mfv = mfm * df['Volume']
+        # Sum over the period
+        sum_mfv = mfv.rolling(window=self.period).sum()
+        sum_volume = df['Volume'].rolling(window=self.period).sum()
+        # CMF
+        cmf = sum_mfv / sum_volume.replace(0, np.nan)
+        df[self.name] = cmf
+        return df

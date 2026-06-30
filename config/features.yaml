@@ -1,0 +1,209 @@
+﻿features:
+  # Trend features
+  - name: sma_10
+    params:
+      period: 10
+      column: Close
+  - name: sma_20
+    params:
+      period: 20
+      column: Close
+  - name: sma_50
+    params:
+      period: 50
+      column: Close
+  - name: sma_100
+    params:
+      period: 100
+      column: Close
+  - name: sma_200
+    params:
+      period: 200
+      column: Close
+  - name: ema_10
+    params:
+      period: 10
+      column: Close
+  - name: ema_20
+    params:
+      period: 20
+      column: Close
+  - name: ema_50
+    params:
+      period: 50
+      column: Close
+  - name: ema_100
+    params:
+      period: 100
+      column: Close
+  - name: ema_200
+    params:
+      period: 200
+      column: Close
+  - name: wma_10
+    params:
+      period: 10
+      column: Close
+  - name: wma_20
+    params:
+      period: 20
+      column: Close
+  - name: wma_50
+    params:
+      period: 50
+      column: Close
+  - name: wma_100
+    params:
+      period: 100
+      column: Close
+  - name: wma_200
+    params:
+      period: 200
+      column: Close
+  - name: macd
+    params:
+      fast_period: 12
+      slow_period: 26
+      signal_period: 9
+      column: Close
+  - name: moving_average_distance_sma_20
+    params:
+      period: 20
+      ma_type: sma
+      column: Close
+  - name: moving_average_slope_sma_20
+    params:
+      period: 20
+      ma_type: sma
+      column: Close
+  - name: price_above_ma_sma_20
+    params:
+      period: 20
+      ma_type: sma
+      column: Close
+  - name: golden_cross_sma_50_200
+    params:
+      short_period: 50
+      long_period: 200
+      ma_type: sma
+      column: Close
+  - name: death_cross_sma_50_200
+    params:
+      short_period: 50
+      long_period: 200
+      ma_type: sma
+      column: Close
+  # Momentum features
+  - name: rsi_14
+    params:
+      period: 14
+  - name: roc_12
+    params:
+      period: 12
+  - name: momentum_10
+    params:
+      period: 10
+  - name: stochastic_oscillator_14_3
+    params:
+      k_period: 14
+      d_period: 3
+  # Volatility features
+  - name: atr_14
+    params:
+      period: 14
+  - name: historical_volatility_20
+    params:
+      period: 20
+  - name: bollinger_bands_20_2
+    params:
+      period: 20
+      std_dev: 2
+  # Volume features
+  - name: volume_sma_20
+    params:
+      period: 20
+      column: Volume
+  - name: relative_volume_20
+    params:
+      period: 20
+      column: Volume
+  - name: obv
+    params:
+      column: Close
+      volume_column: Volume
+  - name: mfi_14
+    params:
+      period: 14
+  - name: cmf_20
+    params:
+      period: 20
+  # Price structure features
+  - name: daily_return
+    params: {}
+  - name: log_return
+    params: {}
+  - name: intraday_return
+    params:
+      open_column: Open
+      close_column: Close
+  - name: gap
+    params:
+      open_column: Open
+      close_column: Close
+  - name: candle_body
+    params:
+      open_column: Open
+      high_column: High
+      low_column: Low
+      close_column: Close
+  - name: upper_wick
+    params:
+      open_column: Open
+      high_column: High
+      low_column: Low
+      close_column: Close
+  - name: lower_wick
+    params:
+      open_column: Open
+      high_column: High
+      low_column: Low
+      close_column: Close
+  - name: range_percent
+    params:
+      high_column: High
+      low_column: Low
+      close_column: Close
+  - name: distance_to_52w_high_252
+    params:
+      high_column: High
+      close_column: Close
+      window: 252
+  - name: distance_to_52w_low_252
+    params:
+      low_column: Low
+      close_column: Close
+      window: 252
+  # Market features (requires benchmark data; assume SPY data is present with prefix SPY_)
+  - name: relative_strength_spy
+    params:
+      asset_column: Close
+      benchmark_column: SPY_Close
+  - name: beta_spy_252
+    params:
+      asset_column: Close
+      benchmark_column: SPY_Close
+      window: 252
+  - name: rolling_corr_spy_252
+    params:
+      asset_column: Close
+      benchmark_column: SPY_Close
+      window: 252
+  - name: excess_return_spy
+    params:
+      asset_column: Close
+      benchmark_column: SPY_Close
+  - name: tracking_error_spy_252
+    params:
+      asset_column: Close
+      benchmark_column: SPY_Close
+      window: 252
