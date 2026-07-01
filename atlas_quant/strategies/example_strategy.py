@@ -15,7 +15,7 @@ class ExampleStrategy(BaseStrategy):
         self.initialized = True
 
     def feature_requirements(self) -> List[str]:
-        # This strategy needs RSI and SMA 50 and SMA 200
+        # This strategy needs RSI (for momentum) and SMA 50 and 200 (for filters)
         return ['rsi_14', 'sma_50', 'sma_200']
 
     def filters(self) -> List[str]:
@@ -23,8 +23,8 @@ class ExampleStrategy(BaseStrategy):
         return ['above_200_ma', 'volume_above_min']
 
     def signal_weights(self) -> Dict[str, float]:
-        # Weight the RSI as momentum signal
-        return {'rsi_14': 1.0}
+        # Weight the momentum signal (which will use RSI)
+        return {'momentum': 1.0}
 
     def build_portfolio(self, scores: dict) -> dict:
         # Simple: select top 2 stocks and equal weight

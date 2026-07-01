@@ -4,7 +4,7 @@
 Implements a paper trading broker for simulated live trading.
 """
 from .broker import IBroker
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 import pandas as pd
 from datetime import datetime
 import uuid

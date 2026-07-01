@@ -18,7 +18,7 @@ class PositionSizer:
             Maximum weight allowed for any position (e.g., 0.05 for 5%).
         risk_per_position : float, optional
             Amount of risk (e.g., volatility) to allocate per position.
-        '''
+        """
         self.method = method
         self.max_position_size = max_position_size
         self.risk_per_position = risk_per_position
@@ -36,7 +36,7 @@ class PositionSizer:
         -------
         pd.Series
             Adjusted weights.
-        '''
+        """
         if self.method == 'equal_weight':
             # Already equal weight; just enforce max position size if needed
             sized = weights.copy()

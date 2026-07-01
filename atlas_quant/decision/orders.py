@@ -1,5 +1,6 @@
 ﻿import pandas as pd
 import numpy as np
+from typing import Optional
 
 def compute_orders(current_weights: pd.Series,
                    target_weights: pd.Series,

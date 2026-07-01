@@ -29,7 +29,7 @@ def trend_signal(feature_matrix: pd.DataFrame, price_col: str = 'Close', ma_col:
     Example trend signal: price above moving average, normalized to 0-100.
     We'll compute: if price > ma -> 100, else 0 (binary). Could also be continuous.
     Returns a Series indexed by asset.
-    '''
+    """
     if price_col not in feature_matrix.columns or ma_col not in feature_matrix.columns:
         return pd.Series(50.0, index=feature_matrix.index)  # neutral
     # Binary: 100 if above, 0 if below
@@ -40,7 +40,7 @@ def relative_strength_signal(feature_matrix: pd.DataFrame) -> pd.Series:
     Example relative strength: ratio of stock price to benchmark price.
     Assumes we have a column like 'relative_strength_spy' (from market features).
     Returns a Series indexed by asset.
-    '''
+    """
     rs_cols = [col for col in feature_matrix.columns if 'relative_strength' in col.lower()]
     if not rs_cols:
         return pd.Series(50.0, index=feature_matrix.index)
@@ -54,7 +54,7 @@ def volume_signal(feature_matrix: pd.DataFrame, volume_col: str = 'Volume', avg_
     Example volume signal: relative volume (volume / average volume).
     If avg_volume_col is provided, use that; otherwise, try to compute from a column like 'volume_sma_20'.
     Returns a Series indexed by asset.
-    '''
+    """
     if volume_col not in feature_matrix.columns:
         return pd.Series(50.0, index=feature_matrix.index)
     if avg_volume_col is None:
@@ -84,7 +84,7 @@ def volatility_signal(feature_matrix: pd.DataFrame, vol_col: str = None) -> pd.S
     We'll do: if we have a volatility column, we'll compute: 100 - volatility (if volatility is already 0-100).
     If not, we'll just return 50.
     Returns a Series indexed by asset.
-    '''
+    """
     if vol_col is None:
         vol_candidates = [c for c in feature_matrix.columns if 'volatility' in c.lower() or 'atr' in c.lower()]
         if not vol_candidates:

@@ -18,7 +18,7 @@ class PortfolioBuilder:
             For volatility weighting, the lookback period to compute volatility (if not already present).
         max_weight : float, optional
             Maximum weight allowed for any single asset (for diversification).
-        '''
+        """
         self.method = method
         self.lookback_period = lookback_period
         self.max_weight = max_weight
@@ -27,7 +27,7 @@ class PortfolioBuilder:
         """
         Given ranked assets (with scores and ranks) and the feature matrix,
         return target weights as a Series indexed by asset.
-        '''
+        """
         # We'll consider only assets that have a rank (i.e., passed filters and were ranked)
         # For simplicity, we'll assume that ranked.index are the assets we want to weight.
         # We'll ignore the rank column and just use the index.

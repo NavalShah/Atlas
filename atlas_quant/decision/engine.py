@@ -45,7 +45,7 @@ class DecisionEngine:
             self.filters = filters or []
         self.ranking_method = ranking_method
         self.ranking_n = ranking_n
-        self.portfolio_method = product_method
+        self.portfolio_method = portfolio_method
         self.portfolio_max_weight = portfolio_max_weight
         self.sizing_method = sizing_method
         self.sizing_max_position_size = sizing_max_position_size

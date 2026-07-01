@@ -18,7 +18,7 @@ class Ranker:
             For 'top_n' method, the number of top ranks to select.
         ascending : bool
             If True, lower scores get better rank (rank 1). Only used if method is 'desc' or 'asc'.
-        '''
+        """
         self.method = method
         self.n = n
         self.ascending = ascending
@@ -30,7 +30,7 @@ class Ranker:
         If method: we'll compute rank using pandas rank.
         For 'top_n', we'll assign rank 1..n to top n and NaN to others.
         For 'percentile', we'll compute percentile rank (0-100).
-        '''
+        """
         # Copy to avoid modifying original
         scores_clean = scores.copy()
         # Remove NaN scores (failed filters) for ranking? We'll keep them as NaN and they will get NaN rank.
