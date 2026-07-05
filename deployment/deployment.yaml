@@ -1,0 +1,27 @@
+# Deployment Configuration for Atlas Quant
+# ========================================
+
+# Operation mode: 'backtest', 'paper', or 'live'
+mode: paper
+
+# If true, runs the entire pipeline but does not submit orders
+dry_run: false
+
+# Paper trading specific settings
+paper_trading: true
+
+# Broker configuration
+broker:
+  # Provider: 'alpaca' (for now, could extend to others)
+  provider: alpaca
+  # Whether to submit orders to the broker
+  submit_orders: true
+  # Whether to log order details
+  log_orders: true
+
+# Rebalancing schedule (using cron syntax or interval strings)
+# Examples: 
+#   - "0 9 * * 1-5" (weekdays at 9AM)
+#   - "1d" (once per day)
+#   - "1h" (once per hour)
+rebalance_schedule: "0 9 * * 1-5"  # Weekdays at 9:00 AM

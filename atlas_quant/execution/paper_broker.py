@@ -1,4 +1,4 @@
-﻿"""Paper Broker
+"""Paper Broker
 ==============
 
 Implements a paper trading broker for simulated live trading.
@@ -302,3 +302,22 @@ class PaperBroker(IBroker):
         market_close = datetime.strptime("16:00", "%H:%M").time()
         
         return market_open <= current_time <= market_close
+    def get_market_clock(self) -> Dict[str, Any]:
+        """
+        Get the current market clock.
+        For simplicity, we return a dummy clock.
+        """
+        now = datetime.now()
+        return {
+            'timestamp': now.isoformat(),
+            'is_open': self.is_market_open(),
+            'next_open': now.replace(hour=9, minute=30, second=0, microsecond=0).isoformat(),
+            'next_close': now.replace(hour=16, minute=0, second=0, microsecond=0).isoformat(),
+        }
+
+    def get_assets(self) -> List[Dict[str, Any]]:
+        """
+        Get all assets available.
+        For simplicity, we return an empty list.
+        """
+        return []
